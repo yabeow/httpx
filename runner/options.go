@@ -73,6 +73,7 @@ type ScanOptions struct {
 	OutputCName               bool
 	OutputCDN                 string
 	OutputResponseTime        bool
+	OutputExtractJSFiles      string
 	PreferHTTPS               bool
 	NoFallback                bool
 	NoFallbackScheme          bool
@@ -162,6 +163,7 @@ type Options struct {
 	filterContentLength       []int
 	Output                    string
 	OutputAll                 bool
+	OutputExtractJSFiles      string
 	StoreResponseDir          string
 	HTTPProxy                 string
 	SocksProxy                string
@@ -409,6 +411,7 @@ func ParseOptions() *Options {
 	flagSet.CreateGroup("output", "Output",
 		flagSet.StringVarP(&options.Output, "output", "o", "", "file to write output results"),
 		flagSet.BoolVarP(&options.OutputAll, "output-all", "oa", false, "filename to write output results in all formats"),
+		flagSet.StringVarP(&options.OutputExtractJSFiles, "output-js", "ojs", "", "file to write extracted javascript files"),
 		flagSet.BoolVarP(&options.StoreResponse, "store-response", "sr", false, "store http response to output directory"),
 		flagSet.StringVarP(&options.StoreResponseDir, "store-response-dir", "srd", "", "store http response to custom directory"),
 		flagSet.BoolVar(&options.CSVOutput, "csv", false, "store output in csv format"),
@@ -761,3 +764,5 @@ func flagsIncompatibleWithSilent(options *Options) []string {
 	}
 	return incompatibleFlagsList
 }
+
+var regexJSFiles = regexp.MustCompile(`(?m)src="([\/\.\-\_\~a-zA-Z0-9]+.js)"`)

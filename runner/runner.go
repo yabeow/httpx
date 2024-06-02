@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -293,6 +294,7 @@ func New(options *Options) (*Runner, error) {
 	scanopts.NoHeadlessBody = options.NoHeadlessBody
 	scanopts.UseInstalledChrome = options.UseInstalledChrome
 	scanopts.ScreenshotTimeout = options.ScreenshotTimeout
+	scanopts.OutputExtractJSFiles = options.OutputExtractJSFiles
 
 	if options.OutputExtractRegexs != nil {
 		for _, regex := range options.OutputExtractRegexs {
@@ -694,7 +696,7 @@ func (r *Runner) RunEnumeration() {
 			}
 		}()
 
-		var plainFile, jsonFile, csvFile, indexFile, indexScreenshotFile *os.File
+		var plainFile, jsonFile, csvFile, indexFile, indexScreenshotFile, jsFile *os.File
 
 		if r.options.Output != "" && r.options.OutputAll {
 			plainFile = openOrCreateFile(r.options.Resume, r.options.Output)
@@ -710,6 +712,11 @@ func (r *Runner) RunEnumeration() {
 		if r.options.Output != "" && plainFile == nil && !jsonOrCsv {
 			plainFile = openOrCreateFile(r.options.Resume, r.options.Output)
 			defer plainFile.Close()
+		}
+
+		if r.options.OutputExtractJSFiles != "" {
+			jsFile = openOrCreateFile(r.options.Resume, r.options.OutputExtractJSFiles)
+			defer jsFile.Close()
 		}
 
 		if r.options.Output != "" && r.options.JSONOutput && jsonFile == nil {
@@ -1052,6 +1059,13 @@ func (r *Runner) RunEnumeration() {
 				//nolint:errcheck // this method needs a small refactor to reduce complexity
 				if csvFile != nil {
 					csvFile.WriteString(row + "\n")
+				}
+			}
+
+			if jsFile != nil && len(resp.JSFiles) > 0 {
+				data, err := json.Marshal(resp.JSFiles)
+				if err == nil {
+					jsFile.WriteString(resp.URL + " " + string(data) + "\n")
 				}
 			}
 
@@ -2041,6 +2055,82 @@ retry:
 		builder.WriteRune(']')
 	}
 
+	jsFiles := []string{}
+	seenJSFiles := make(map[string]struct{})
+	if scanopts.OutputExtractJSFiles != "" {
+		for _, chain := range resp.Chain {
+			for _, matchs := range regexJSFiles.FindAllSubmatch(chain.Response, -1) {
+				url, err := url.Parse(chain.RequestURL)
+				if err == nil {
+					jsFile := string(matchs[1])
+					if strings.HasPrefix(jsFile, "//") {
+						if url.Scheme == "https" {
+							jsFiles = append(jsFiles, "https:"+jsFile)
+						} else {
+							jsFiles = append(jsFiles, "http:"+jsFile)
+						}
+					} else if strings.HasPrefix(jsFile, "/") {
+						if url.Scheme == "https" {
+							jsFiles = append(jsFiles, fmt.Sprintf("https://%s%s", url.Host, jsFile))
+						} else {
+							jsFiles = append(jsFiles, fmt.Sprintf("http://%s%s", url.Host, jsFile))
+						}
+					} else {
+						parentPath := ""
+						if strings.Count(url.Path, "/") == 0 {
+							parentPath = url.Path
+						} else {
+							parentPath = url.Path[0:strings.LastIndex(url.Path, "/")]
+						}
+						url.Path = filepath.Join(parentPath, jsFile)
+
+						if _, ok := seenJSFiles[url.String()]; !ok {
+							jsFiles = append(jsFiles, url.String())
+							seenJSFiles[url.String()] = struct{}{}
+						}
+					}
+				}
+			}
+		}
+
+		for _, matchs := range regexJSFiles.FindAllSubmatch(resp.Data, -1) {
+			rawURL := resp.GetChainLastURL()
+			if rawURL == "" {
+				rawURL = req.URL.String()
+			}
+			url, err := url.Parse(rawURL)
+			if err == nil {
+				jsFile := string(matchs[1])
+				if strings.HasPrefix(jsFile, "//") {
+					if url.Scheme == "https" {
+						jsFiles = append(jsFiles, "https:"+jsFile)
+					} else {
+						jsFiles = append(jsFiles, "http:"+jsFile)
+					}
+				} else if strings.HasPrefix(jsFile, "/") {
+					if url.Scheme == "https" {
+						jsFiles = append(jsFiles, fmt.Sprintf("https://%s%s", url.Host, jsFile))
+					} else {
+						jsFiles = append(jsFiles, fmt.Sprintf("http://%s%s", url.Host, jsFile))
+					}
+				} else {
+					parentPath := ""
+					if strings.Count(url.Path, "/") == 0 {
+						parentPath = url.Path
+					} else {
+						parentPath = url.Path[0:strings.LastIndex(url.Path, "/")]
+					}
+					url.Path = filepath.Join(parentPath, jsFile)
+
+					if _, ok := seenJSFiles[url.String()]; !ok {
+						jsFiles = append(jsFiles, url.String())
+						seenJSFiles[url.String()] = struct{}{}
+					}
+				}
+			}
+		}
+	}
+
 	result := Result{
 		Timestamp:        time.Now(),
 		Request:          request,
@@ -2094,6 +2184,7 @@ retry:
 			"PageType": r.errorPageClassifier.Classify(respData),
 			"pHash":    pHash,
 		},
+		JSFiles:           jsFiles,
 		TechnologyDetails: technologyDetails,
 		Resolvers:         resolvers,
 		RequestRaw:        requestDump,
