@@ -40,6 +40,7 @@ type Result struct {
 	Hashes             map[string]interface{} `json:"hash,omitempty" csv:"hash"`
 	ExtractRegex       []string               `json:"extract_regex,omitempty" csv:"extract_regex"`
 	CDNName            string                 `json:"cdn_name,omitempty" csv:"cdn_name"`
+	CDNType            string                 `json:"cdn_type,omitempty" csv:"cdn_type"`
 	SNI                string                 `json:"sni,omitempty" csv:"sni"`
 	Port               string                 `json:"port,omitempty" csv:"port"`
 	Raw                string                 `json:"-" csv:"-"`
@@ -58,7 +59,9 @@ type Result struct {
 	Host               string                 `json:"host,omitempty" csv:"host"`
 	Path               string                 `json:"path,omitempty" csv:"path"`
 	FavIconMMH3        string                 `json:"favicon,omitempty" csv:"favicon"`
+	FavIconMD5         string                 `json:"favicon_md5,omitempty" csv:"favicon"`
 	FaviconPath        string                 `json:"favicon_path,omitempty" csv:"favicon_path"`
+	FaviconURL         string                 `json:"favicon_url,omitempty" csv:"favicon_url"`
 	FinalURL           string                 `json:"final_url,omitempty" csv:"final_url"`
 	ResponseHeaders    map[string]interface{} `json:"header,omitempty" csv:"header"`
 	RawHeaders         string                 `json:"raw_header,omitempty" csv:"raw_header"`
@@ -74,7 +77,7 @@ type Result struct {
 	Chain              []httpx.ChainItem      `json:"chain,omitempty" csv:"chain"`
 	Words              int                    `json:"words" csv:"words"`
 	Lines              int                    `json:"lines" csv:"lines"`
-	StatusCode         int                    `json:"status_code,omitempty" csv:"status_code"`
+	StatusCode         int                    `json:"status_code" csv:"status_code"`
 	ContentLength      int                    `json:"content_length" csv:"content_length"`
 	Failed             bool                   `json:"failed" csv:"failed"`
 	VHost              bool                   `json:"vhost,omitempty" csv:"vhost"`
@@ -90,11 +93,14 @@ type Result struct {
 	KnowledgeBase      map[string]interface{} `json:"knowledgebase,omitempty" csv:"knowledgebase"`
 	Resolvers          []string               `json:"resolvers,omitempty" csv:"resolvers"`
 	JSFiles            []string               `json:"js_files,omitempty" csv:"js_files"`
+	Fqdns              []string               `json:"body_fqdn,omitempty"`
+	Domains            []string               `json:"body_domains,omitempty"`
 
 	// Internal Fields
 	TechnologyDetails map[string]wappalyzer.AppInfo `json:"-" csv:"-"`
 	RequestRaw        []byte                        `json:"-" csv:"-"`
 	Response          *httpx.Response               `json:"-" csv:"-"`
+	FaviconData       []byte                        `json:"-" csv:"-"`
 }
 
 // function to get dsl variables from result struct

@@ -55,7 +55,7 @@ func New(options *Options) (*HTTPX, error) {
 
 	if options.NetworkPolicy != nil {
 		httpx.NetworkPolicy = options.NetworkPolicy
-		fastdialerOpts.WithNetworkPolicyOptions = options.NetworkPolicy.Options
+		fastdialerOpts.NetworkPolicy = options.NetworkPolicy
 	}
 	fastdialerOpts.WithDialerHistory = true
 	fastdialerOpts.WithZTLS = options.ZTLS
@@ -194,8 +194,13 @@ func New(options *Options) (*HTTPX, error) {
 
 	httpx.htmlPolicy = bluemonday.NewPolicy()
 	httpx.CustomHeaders = httpx.Options.CustomHeaders
-	if options.CdnCheck != "false" || options.ExcludeCdn {
-		httpx.cdn = cdncheck.New()
+
+	if options.CDNCheckClient != nil {
+		httpx.cdn = options.CDNCheckClient
+	} else {
+		if options.CdnCheck != "false" || options.ExcludeCdn {
+			httpx.cdn = cdncheck.New()
+		}
 	}
 
 	return httpx, nil
@@ -220,6 +225,7 @@ get_response:
 	}
 
 	var resp Response
+	resp.Input = req.Host
 
 	resp.Headers = httpresp.Header.Clone()
 
@@ -311,7 +317,10 @@ get_response:
 		}
 	}
 
-	resp.CSPData = h.CSPGrab(&resp)
+	if h.Options.ExtractFqdn {
+		resp.CSPData = h.CSPGrab(&resp)
+		resp.BodyDomains = h.BodyDomainGrab(&resp)
+	}
 
 	// build the redirect flow by reverse cycling the response<-request chain
 	if !h.Options.Unsafe {
